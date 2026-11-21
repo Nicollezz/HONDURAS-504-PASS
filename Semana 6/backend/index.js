@@ -2,7 +2,7 @@ const express = require('express')
 const Employees = require('./modelos/Employees')
 const sequelize = require('./conexion/db')
 
-const app = express()
+const app = express() 
 
 app.use(express.json())
 
