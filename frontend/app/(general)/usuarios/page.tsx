@@ -287,7 +287,7 @@ export default function UsuariosPage() {
                   <td className='p-3 border-r border-black'>{u.persona?.correo_electronico}</td>
                   <td className='p-3 border-r border-black'>{u.persona?.telefono}</td>
                   <td className='p-3 border-r border-black'>
-                    {u.rol_usuario?.nombre_rol || u.id_rol_usuario}
+                    {u.rol?.nombre_rol || u.id_rol_usuario}
                   </td>
                   <td className='p-3 flex gap-2'>
                     <button
