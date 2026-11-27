@@ -3,6 +3,8 @@ const sequelize = require('./db/connection');
 const Usuario = require('./Modelos/Usuario');
 const Persona = require('./Modelos/Persona');
 const RolUsuario = require('./Modelos/RolUsuario');
+const CodigoQR = require('./Modelos/CodigoQR');
+const crypto = require('crypto');
 
 var cors = require('cors');
 
@@ -204,6 +206,121 @@ app.delete('/usuario/:id_usuario', async (req, res) => {
         res.status(500).json({ error: 'Error al eliminar usuario: ' + error });
     }
 });
+
+
+// ==========================================
+// 4. GENERAR CODIGO QR
+// ==========================================
+
+app.post('/qr/generar', async (req, res) => {
+    try {
+        const { id_usuario } = req.body;
+
+        if (!id_usuario) {
+            return res.status(400).json({
+                mensaje: 'Usuario no especificado'
+            });
+        }
+
+        // Desactivar códigos anteriores del usuario
+        await CodigoQR.update(
+            { estado_qr: false },
+            { where: { id_usuario, estado_qr: true } }
+        );
+
+        // Generar token aleatorio
+        const token = crypto.randomBytes(32).toString('hex');
+
+        const fechaCreacion = new Date();
+
+        // Duración de cinco minutos
+        const duracion = 300;
+
+        const fechaExpiracion = new Date(
+            fechaCreacion.getTime() + duracion * 1000
+        );
+
+        const nuevoQR = await CodigoQR.create({
+            estado_qr: true,
+            duracion_qr: duracion,
+            token_qr: token,
+            fecha_creacion: fechaCreacion,
+            fecha_expiracion: fechaExpiracion,
+            fecha_uso: null,
+            id_usuario: id_usuario,
+            id_historial: null
+        });
+
+        res.status(201).json({
+            mensaje: 'QR generado correctamente',
+            token_qr: nuevoQR.token_qr,
+            duracion_qr: duracion,
+            fecha_expiracion: fechaExpiracion
+        });
+
+    } catch (error) {
+        console.error('Error al generar QR:', error);
+        res.status(500).json({
+            mensaje: 'Error al generar el código QR'
+        });
+    }
+});
+
+
+// ==========================================
+// 5. VALIDAR CODIGO QR
+// ==========================================
+
+app.post('/qr/validar', async (req, res) => {
+    try {
+        const { token_qr } = req.body;
+
+        if (!token_qr) {
+            return res.status(400).json({
+                mensaje: 'Token no proporcionado'
+            });
+        }
+
+        const qr = await CodigoQR.findOne({
+            where: {
+                token_qr: token_qr,
+                estado_qr: true
+            }
+        });
+
+        if (!qr) {
+            return res.status(400).json({
+                mensaje: 'Código QR inválido o ya utilizado'
+            });
+        }
+
+        const ahora = new Date();
+
+        if (ahora >= new Date(qr.fecha_expiracion)) {
+            await qr.update({ estado_qr: false });
+
+            return res.status(400).json({
+                mensaje: 'El código QR ha expirado'
+            });
+        }
+
+        await qr.update({
+            estado_qr: false,
+            fecha_uso: ahora.toTimeString().slice(0, 8)
+        });
+
+        res.status(200).json({
+            mensaje: 'Pase exitoso'
+        });
+
+    } catch (error) {
+        console.error('Error al validar QR:', error);
+        res.status(500).json({
+            mensaje: 'Error al validar el código QR'
+        });
+    }
+});
+
 
 app.listen(5000, () => {
     console.log('Aplicacion ejecutando en puerto 5000');
